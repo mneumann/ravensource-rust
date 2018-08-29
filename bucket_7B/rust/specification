@@ -1,0 +1,80 @@
+DEF[PORTVERSION]=	1.28.0
+DEF[BOOTSTRAP_RUST]=	1.27.0
+DEF[BOOTSTRAP_CARGO]=	0.28.0
+# ----------------------------------------------------------------------------
+
+NAMEBASE=		rust
+VERSION=		${PORTVERSION}
+KEYWORDS=		lang
+VARIANTS=		standard
+SDESC[standard]=	Safe systems programming language
+HOMEPAGE=		https://www.rust-lang.org/
+CONTACT=		Michael_Neumann[mneumann@ntecs.de]
+
+DOWNLOAD_GROUPS=	main bootstrap
+SITES[main]=		https://static.rust-lang.org/dist/
+SITES[bootstrap]=	https://www.ntecs.de/downloads/rust/${BOOTSTRAP_RUST}/
+DISTFILE[1]=		rustc-${PORTVERSION}-src.tar.xz:main
+DISTFILE[2]=		rustc-${BOOTSTRAP_RUST}-x86_64-unknown-dragonfly.tar.xz:bootstrap
+DISTFILE[3]=		rust-std-${BOOTSTRAP_RUST}-x86_64-unknown-dragonfly.tar.xz:bootstrap
+DISTFILE[4]=		cargo-${BOOTSTRAP_CARGO}-x86_64-unknown-dragonfly.tar.xz:bootstrap
+DF_INDEX=		1 2 3 4
+
+SPKGS[standard]=	single
+
+OPTIONS_AVAILABLE=	none
+OPTIONS_STANDARD=	none
+
+FPC_EQUIVALENT=		lang/rust
+
+DISTNAME=		rustc-${PORTVERSION}-src
+
+# ONLY_FOR_OPSYS=         dragonfly
+
+LICENSE=		APACHE20:single MIT:single
+LICENSE_FILE=		APACHE20:{{WRKSRC}}/LICENSE-APACHE MIT:{{WRKSRC}}/LICENSE-MIT
+LICENSE_SCHEME=		dual
+LICENSE_TERMS=		single:{{WRKSRC}}/COPYRIGHT
+
+BUILD_DEPENDS=		llvm60:llvm:standard bash:primary:standard cmake:single:standard
+
+USES=			gmake python:py27,build
+
+MUST_CONFIGURE=		yes
+CONFIGURE_ARGS=		--release-channel=stable
+			--enable-cargo-openssl-static
+			--enable-extended
+			--enable-vendor
+			--enable-locked-deps
+			--disable-jemalloc
+			--local-rust-root={{WRKDIR}}/bootstrap
+			--llvm-root={{LOCALBASE}}/llvm60
+			--disable-rpath
+
+MAKE_ENV=		LIBSSH2_NO_PKG_CONFIG=1
+			LIBCURL_NO_PKG_CONFIG=1
+			LIBZ_NO_PKG_CONFIG=1
+			PROFILE=release
+			LIBZ_SYS_STATIC=1
+			OPENSSL_NO_PKG_CONFIG=1
+			LD_LIBRARY_PATH={{WRKDIR}}/bootstrap/lib
+
+SKIP_INSTALL=		yes
+
+# Install bootstrap components
+post-extract:
+	${MKDIR} ${WRKDIR}/bootstrap
+	${LOCALBASE}/bin/bash \
+		${WRKDIR}/rustc-${BOOTSTRAP_RUST}-x86_64-unknown-dragonfly/install.sh \
+		--prefix=${WRKDIR}/bootstrap
+	${LOCALBASE}/bin/bash \
+		${WRKDIR}/rust-std-${BOOTSTRAP_RUST}-x86_64-unknown-dragonfly/install.sh \
+		--prefix=${WRKDIR}/bootstrap
+	${LOCALBASE}/bin/bash \
+		${WRKDIR}/cargo-${BOOTSTRAP_CARGO}-x86_64-unknown-dragonfly/install.sh \
+		--prefix=${WRKDIR}/bootstrap
+	cp /raven/toolchain/temp-rust-fix/libstdc++.so.9 ${WRKDIR}/bootstrap/lib
+
+do-build:
+	(cd ${BUILD_WRKSRC} && ${SETENV} ${MAKE_ENV} \
+		${LOCALBASE}/bin/python2.7 x.py build --verbose --config ./config.toml --jobs 10)
